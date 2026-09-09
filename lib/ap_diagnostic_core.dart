@@ -3922,7 +3922,7 @@ class UDSDiagnostic {
 
         if ((responseStatus == "NOERROR" || responseStatus == "NO_ERROR") &&
             rxArray != null) {
-          returnStatus = "NO_ERROR";
+          returnStatus = "";
 
           // ✅ FIX: UDS always 4 bytes per DTC (3 code + 1 status)
           int step = (readDtcIndex == ReadDTCIndex.KWP_2BYTE_DTC) ? 3 : 4;
@@ -4032,7 +4032,7 @@ class UDSDiagnostic {
         var resp = await dongleComm!.canTxRx(3, "1902FF");
         if (resp.ecuResponseStatus == "NOERROR" &&
             resp.actualDataBytes != null) {
-          returnStatus = "NO_ERROR";
+          // returnStatus = "NO_ERROR";
           var data = resp.actualDataBytes!;
           int count = (data.length - 3) ~/ 4;
           for (int i = 0; i < count; i++) {
@@ -4052,10 +4052,43 @@ class UDSDiagnostic {
         }
       }
       // ─── CASE 4: UDS GCU (Decimal ID) ─────────────────────────────────────────
+      // else if (readDtcIndex == ReadDTCIndex.UDS_GCU) {
+      //   var resp = await dongleComm!.canTxRx(3, "1902FF");
+      //   if (resp.ecuResponseStatus == "NOERROR" &&
+      //       resp.actualDataBytes != null) {
+      //     returnStatus = "NO_ERROR";
+      //     var data = resp.actualDataBytes!;
+      //     int count = (data.length - 3) ~/ 4;
+      //     for (int i = 0; i < count; i++) {
+      //       int p = 3 + (i * 4);
+      //       if (p + 3 >= data.length) break;
+      //       int id = (data[p] << 16) | (data[p + 1] << 8) | data[p + 2];
+      //       String desc = "Unknown";
+      //       switch (data[p + 3]) {
+      //         case 0xF1:
+      //           desc = "Active Warning";
+      //           break;
+      //         case 0xF2:
+      //           desc = "InActive Warning";
+      //           break;
+      //         case 0xF3:
+      //           desc = "Active Shutdown";
+      //           break;
+      //         case 0xF4:
+      //           desc = "Inactive Shutdown";
+      //           break;
+      //       }
+      //       dtcArray.add([id.toString(), desc]);
+      //       dtcCounter++;
+      //     }
+      //   }
+      // }
+      // ─── CASE 4: UDS GCU (Decimal ID) ─────────────────────────────────────────
       else if (readDtcIndex == ReadDTCIndex.UDS_GCU) {
         var resp = await dongleComm!.canTxRx(3, "1902FF");
-        if (resp.ecuResponseStatus == "NOERROR" &&
-            resp.actualDataBytes != null) {
+        String respStatus = resp.ecuResponseStatus ?? "";
+
+        if (respStatus == "NOERROR") {
           returnStatus = "NO_ERROR";
           var data = resp.actualDataBytes!;
           int count = (data.length - 3) ~/ 4;
@@ -4081,6 +4114,10 @@ class UDSDiagnostic {
             dtcArray.add([id.toString(), desc]);
             dtcCounter++;
           }
+        } else {
+          // ✅ Matches original C#: pass through the raw ECU status directly,
+          // no fallback substitution for an empty string.
+          returnStatus = respStatus;
         }
       }
       // ─── CASE 5: KWP PRIMITIVE ────────────────────────────────────────────────
@@ -5311,6 +5348,41 @@ class UDSDiagnostic {
                     }
                   }
                 }
+              } else if (currentVar.datatype == "TIMESTAMP_UNIX") {
+                print("---START TIMESTAMP_UNIX--");
+                int unsignedPidIntValue = 0;
+                int noOfBytes = currentVar.noOfBytes ?? 4;
+                int startByte = currentVar.startByte ?? 0;
+
+                for (int j = 0; j < noOfBytes; j++) {
+                  int shift = (noOfBytes - 1 - j) * 8;
+                  int byteVal = rxArray[startByte + txFrameLength - 1 + j];
+                  unsignedPidIntValue |= (byteVal << shift);
+                }
+
+                try {
+                  // Epoch seconds are UTC by definition — parse as UTC, then apply
+                  // a fixed IST offset (UTC+5:30) rather than relying on the device's
+                  // own timezone setting.
+                  final utcDt = DateTime.fromMillisecondsSinceEpoch(
+                    unsignedPidIntValue * 1000,
+                    isUtc: true,
+                  );
+                  final istDt = utcDt.add(
+                    const Duration(hours: 5, minutes: 30),
+                  );
+
+                  dataValue =
+                      "${istDt.year.toString().padLeft(4, '0')}-"
+                      "${istDt.month.toString().padLeft(2, '0')}-"
+                      "${istDt.day.toString().padLeft(2, '0')} "
+                      "${istDt.hour.toString().padLeft(2, '0')}:"
+                      "${istDt.minute.toString().padLeft(2, '0')}:"
+                      "${istDt.second.toString().padLeft(2, '0')}";
+                } catch (e) {
+                  dataValue = "Invalid timestamp";
+                }
+                print("---END TIMESTAMP_UNIX--");
               } else if (currentVar.datatype == "IQA") {
                 // Ensure we don't sublist past the array length
                 if (rxArray.length > 3) {
@@ -5663,6 +5735,34 @@ class UDSDiagnostic {
                     dataValue = item.message ?? "";
                   }
                 }
+              }
+            } else if (currentVar.datatype == "TIMESTAMP_UNIX") {
+              int unsignedPidIntValue = 0;
+              int noOfBytes = currentVar.noOfBytes ?? 4;
+              int startByte = currentVar.startByte ?? 0;
+
+              for (int j = 0; j < noOfBytes; j++) {
+                int byteVal = rxArray[startByte + txFrameLen - 1 + j];
+                unsignedPidIntValue |= (byteVal << ((noOfBytes - 1 - j) * 8));
+              }
+
+              try {
+                // Epoch seconds are always UTC by definition — parse as UTC first,
+                // then convert to the device's local timezone for display.
+                final dt = DateTime.fromMillisecondsSinceEpoch(
+                  unsignedPidIntValue * 1000,
+                  isUtc: true,
+                ).toLocal();
+
+                dataValue =
+                    "${dt.year.toString().padLeft(4, '0')}-"
+                    "${dt.month.toString().padLeft(2, '0')}-"
+                    "${dt.day.toString().padLeft(2, '0')} "
+                    "${dt.hour.toString().padLeft(2, '0')}:"
+                    "${dt.minute.toString().padLeft(2, '0')}:"
+                    "${dt.second.toString().padLeft(2, '0')}";
+              } catch (e) {
+                dataValue = "Invalid timestamp";
               }
             } else if (currentVar.datatype == "IQA") {
               dataValue = decodeIQA1(
@@ -6448,7 +6548,7 @@ class UDSDiagnostic {
       int indexDS = indexStr.indexOf("DS1");
 
       if (isStartTest) {
-        await dongleComm!.canStartTP();
+        await dongleComm!.canStartTp();
       }
 
       // Diagnostic Session and Security Access logic
@@ -6490,7 +6590,7 @@ class UDSDiagnostic {
       if (response.ecuResponseStatus != "NOERROR" &&
           indexStr != "NA" &&
           isStartTest) {
-        await dongleComm!.canStopTP();
+        await dongleComm!.canStopTp();
         writeParameterResp = WriteParameterResponse(
           status: response.ecuResponseStatus,
           dataArray: response.actualDataBytes,
@@ -6514,11 +6614,11 @@ class UDSDiagnostic {
       }
 
       if (!isStartTest) {
-        await dongleComm!.canStopTP();
+        await dongleComm!.canStopTp();
       }
     } catch (ex) {
       print("Actuator Test Error: $ex");
-      await dongleComm!.canStopTP();
+      await dongleComm!.canStopTp();
     }
 
     return writeParameterResp;
@@ -8239,10 +8339,10 @@ class UDSDiagnostic {
           await dongleComm!.canSetP2Max(info.trim());
         } else if (command == "stopTP") {
           print("🔧 stopTP");
-          await dongleComm!.canStopTP();
+          await dongleComm!.canStopTp();
         } else if (command == "startTP") {
           print("🔧 startTP");
-          await dongleComm!.canStartTP();
+          await dongleComm!.canStartTp();
         } else {
           print("⚠️ Unknown command '$command' — skipping");
         }
@@ -8796,10 +8896,10 @@ class UDSDiagnostic {
           await dongleComm!.canSetP2Max(info.trim());
         } else if (command == "stopTP") {
           print("🔧 stopTP");
-          await dongleComm!.canStopTP();
+          await dongleComm!.canStopTp();
         } else if (command == "startTP") {
           print("🔧 startTP");
-          await dongleComm!.canStartTP();
+          await dongleComm!.canStartTp();
         } else {
           print("⚠️ Unknown command '$command' — skipping");
         }
@@ -8829,5 +8929,12 @@ class UDSDiagnostic {
     );
 
     return pidResponse;
+  }
+
+  Future<ResponseArrayStatus> sendCommand(List<int> requestCommand) async {
+    return await dongleComm!.canTxRx(
+      requestCommand.length,
+      byteArrayToString(Uint8List.fromList(requestCommand)),
+    );
   }
 }
