@@ -6508,10 +6508,295 @@ class UDSDiagnostic {
     return result;
   }
 
+  // Future<ReadParameterResponse> readParametersFromAddr(
+  //   ReadParameterPID readParameter,
+  //   String pidByAddrSeq,
+  //   SeedKeyIndexType? ecuSeedKeyIndex,
+  // ) async {
+  //   List<String> lineData = pidByAddrSeq.split('\n');
+
+  //   ResponseArrayStatus? reprogrammingResponse;
+  //   ReadParameterResponse readParameterResponse = ReadParameterResponse();
+  //   Uint8List seedKey = Uint8List(0);
+
+  //   try {
+  //     bool isReadStarted = false;
+  //     for (int i = 0; i < lineData.length; i++) {
+  //       String formattedLine = lineData[i].replaceAll('\r', '').trim();
+
+  //       if (formattedLine.startsWith("//") || formattedLine == "") {
+  //         continue;
+  //       }
+
+  //       if (formattedLine.contains("startread")) isReadStarted = true;
+
+  //       if (isReadStarted && formattedLine.contains("endread")) {
+  //         isReadStarted = false;
+  //       }
+
+  //       if (!isReadStarted) continue;
+
+  //       List<String> parts = formattedLine.split(':');
+  //       String command = parts[0];
+  //       String info = parts.length > 1 ? parts[1] : "";
+
+  //       if (command == "send") {
+  //         List<String> splitData = info.split('+');
+  //         List<int> txFrameList = [];
+
+  //         for (var item in splitData) {
+  //           if (!item.contains("<")) {
+  //             txFrameList.addAll(hexStringToByteArray(item));
+  //           } else {
+  //             int endIndex = item.indexOf('>');
+  //             // item.substring(1, endIndex) gets content between < and >
+  //             String bracketString = item.substring(1, endIndex);
+  //             List<String> bracketParts = bracketString.split(',');
+  //             String reference = bracketParts[0];
+
+  //             // Convert hex length string to int
+  //             int copyLength = int.parse(bracketParts[1], radix: 16);
+  //             List<int> copyArray = [];
+
+  //             if (reference.contains("key")) {
+  //               copyArray = List<int>.from(seedKey);
+  //             } else if (reference.contains("pid_addr")) {
+  //               copyArray = hexStringToByteArray(readParameter.pid ?? "");
+
+  //               if (copyArray.length > copyLength) {
+  //                 copyArray = copyArray.sublist(copyArray.length - copyLength);
+  //               }
+  //             } else if (reference.contains("pid_len")) {
+  //               // Convert totalLen to bytes (Big Endian logic like C# Array.Reverse)
+  //               int totalLen = readParameter.totalLen ?? 0;
+  //               ByteData bdata = ByteData(4)
+  //                 ..setUint32(0, totalLen, Endian.big);
+  //               copyArray = bdata.buffer.asUint8List().toList();
+
+  //               if (copyArray.length > copyLength) {
+  //                 copyArray = copyArray.sublist(copyArray.length - copyLength);
+  //               }
+  //             }
+
+  //             // Ensure the copyArray matches the requested copyLength
+  //             if (copyArray.length > copyLength) {
+  //               copyArray = copyArray.sublist(0, copyLength);
+  //             } else if (copyArray.length < copyLength) {
+  //               // Pad with zeros if too short
+  //               copyArray = List<int>.from(copyArray)
+  //                 ..addAll(List.filled(copyLength - copyArray.length, 0));
+  //             }
+
+  //             txFrameList.addAll(copyArray);
+  //           }
+  //         }
+
+  //         String txHexString = byteArrayToString(
+  //           Uint8List.fromList(txFrameList),
+  //         );
+  //         print("send : Sending Command $txHexString");
+
+  //         reprogrammingResponse = await dongleComm!.canTxRx(
+  //           txFrameList.length,
+  //           txHexString,
+  //         );
+
+  //         // Handle "Required Time Delay Not Expired" loop
+  //         while (reprogrammingResponse?.ecuResponseStatus ==
+  //             "ECUERROR_REQUIREDTIMEDELAYNOTEXPIRED") {
+  //           await Future.delayed(Duration(milliseconds: 300));
+  //           reprogrammingResponse = await dongleComm!.canTxRx(
+  //             txFrameList.length,
+  //             txHexString,
+  //           );
+  //         }
+
+  //         if (reprogrammingResponse?.ecuResponseStatus != "NOERROR") {
+  //           print(
+  //             "ELMZ : --------- reprogrammingResponse ERROR------------==${reprogrammingResponse?.ecuResponseStatus}",
+  //           );
+  //           readParameterResponse = ReadParameterResponse()
+  //             ..pidId = readParameter.pidId
+  //             ..status = reprogrammingResponse?.ecuResponseStatus;
+  //           return readParameterResponse;
+  //         }
+  //       } else if (command == "sleep") {
+  //         await Future.delayed(Duration(milliseconds: int.parse(info)));
+  //       }
+  //       // else if (command == "function") {
+  //       //   if (info.contains("CalculateKeyFromSeed")) {
+  //       //     int startIdx = info.indexOf('[') + 1;
+  //       //     int endIdx = info.indexOf(']');
+  //       //     String sqrBktInfo = info.substring(startIdx, endIdx);
+  //       //     List<String> params = sqrBktInfo.split(',');
+  //       //     String seedKeyIndexStr = params[0].replaceAll(
+  //       //       '-',
+  //       //       '_',
+  //       //     ); // e.g., "UDS_LEVEL_1"
+  //       //     // 1. Convert String to Enum
+  //       //     // We look for a match in SeedKeyIndexType.values
+  //       //     SeedKeyIndexType? selectedIndex;
+  //       //     try {
+  //       //       selectedIndex = SeedKeyIndexType.values.firstWhere(
+  //       //         (e) => e.toString().split('.').last == seedKeyIndexStr,
+  //       //       );
+  //       //     } catch (e) {
+  //       //       print("Error: $seedKeyIndexStr is not a valid SeedKeyIndexType");
+  //       //     }
+  //       //     if (selectedIndex != null) {
+  //       //       Uint8List actualBytes = reprogrammingResponse!.actualDataBytes!;
+  //       //       // Skip the first 2 bytes (usually service ID and sub-function)
+  //       //       Uint8List seedArray = actualBytes.sublist(2);
+  //       //       print(
+  //       //         "-------seed array = ${byteArrayToString(seedArray)}-------",
+  //       //       );
+  //       //       print("-------get key-------");
+  //       //       // 2. Pass the Enum 'selectedIndex', not the String
+  //       //       // Also ensuring we initialize the keyOutput list if your method requires it
+  //       //       List<int> keyBuffer = [];
+  //       //       await calculateSeedkey!.calculateSeedkey(
+  //       //         index: selectedIndex,
+  //       //         seed: seedArray,
+  //       //         keyOutput: keyBuffer,
+  //       //       );
+  //       //       // 3. Convert the result back to Uint8List
+  //       //       seedKey = Uint8List.fromList(keyBuffer);
+  //       //       print(
+  //       //         "-------get key response = ${byteArrayToString(seedKey)}-------",
+  //       //       );
+  //       //     }
+  //       //   }
+  //       // }
+  //       // else if (command == "function") {
+  //       //   if (info.contains("CalculateKeyFromSeed")) {
+  //       //     int startIdx = info.indexOf('[') + 1;
+  //       //     int endIdx = info.indexOf(']');
+  //       //     String sqrBktInfo = info.substring(startIdx, endIdx);
+  //       //     List<String> params = sqrBktInfo.split(',');
+  //       //     String seedKeyIndexStr = params[0].replaceAll('-', '_');
+  //       //     final selectedIndex = SeedKeyIndexType.fromApi(
+  //       //       seedKeyIndexStr,
+  //       //     ); // ✅ matches "KOEL_CPCB4_LOW_HP_ECU"
+  //       //     if (selectedIndex == null) {
+  //       //       print("❌ Unknown seed-key type: $seedKeyIndexStr");
+  //       //       readParameterResponse
+  //       //         ..pidId = readParameter.pidId
+  //       //         ..status = "SEEDKEY_TYPE_NOT_FOUND";
+  //       //       return readParameterResponse; // abort — never send the <key> frame with zeros
+  //       //     }
+  //       //     Uint8List seedArray = reprogrammingResponse!.actualDataBytes!
+  //       //         .sublist(2);
+  //       //     print("-------seed array = ${byteArrayToString(seedArray)}-------");
+  //       //     List<int> keyBuffer = [];
+  //       //     await calculateSeedkey!.calculateSeedkey(
+  //       //       index: selectedIndex,
+  //       //       seed: seedArray,
+  //       //       keyOutput: keyBuffer,
+  //       //     );
+  //       //     seedKey = Uint8List.fromList(keyBuffer);
+  //       //     print(
+  //       //       "-------get key response = ${byteArrayToString(seedKey)}-------",
+  //       //     );
+  //       //   }
+  //       // }
+  //       else if (command == "function") {
+  //         if (info.contains("CalculateKeyFromSeed")) {
+  //           int startIdx = info.indexOf('[') + 1;
+  //           int endIdx = info.indexOf(']');
+
+  //           // ✅ CHANGED: supports both [8] and [NAME,8]
+  //           final List<String> params = info
+  //               .substring(startIdx, endIdx)
+  //               .split(',')
+  //               .map((s) => s.trim())
+  //               .where((s) => s.isNotEmpty)
+  //               .toList();
+
+  //           if (params.isEmpty) {
+  //             print("❌ CalculateKeyFromSeed has no parameters: $info");
+  //             return ReadParameterResponse()
+  //               ..pidId = readParameter.pidId
+  //               ..status = "SEEDKEY_SCRIPT_INVALID";
+  //           }
+
+  //           // ✅ CHANGED: length is always the LAST param
+  //           final int seedLen = int.parse(params.last, radix: 16);
+
+  //           // ✅ CHANGED: ECU config first, script name only as fallback
+  //           final SeedKeyIndexType? selectedIndex =
+  //               ecuSeedKeyIndex ??
+  //               (params.length >= 2
+  //                   ? SeedKeyIndexType.fromApi(params[0].replaceAll('-', '_'))
+  //                   : null);
+
+  //           if (selectedIndex == null) {
+  //             print("❌ No seed-key algo — ECU config empty, script: $info");
+  //             return ReadParameterResponse()
+  //               ..pidId = readParameter.pidId
+  //               ..status = "SEEDKEY_TYPE_NOT_FOUND";
+  //           }
+  //           print(
+  //             "🔑 seed-key algo: ${selectedIndex.name} "
+  //             "(${ecuSeedKeyIndex != null ? 'from ECU' : 'from script'})",
+  //           );
+
+  //           // ✅ Matches C#: seed is exactly seedLen bytes, zero-padded if short
+  //           final Uint8List rx = reprogrammingResponse!.actualDataBytes!;
+  //           if (rx.length < 2) {
+  //             // ✅ NEW: guard — a too-short seed response would make 'available' negative
+  //             return ReadParameterResponse()
+  //               ..pidId = readParameter.pidId
+  //               ..status = "SEED_RESPONSE_INVALID";
+  //           }
+  //           final Uint8List seedArray = Uint8List(seedLen);
+  //           final int available = rx.length - 2;
+  //           seedArray.setRange(
+  //             0,
+  //             available < seedLen ? available : seedLen,
+  //             rx.sublist(2),
+  //           );
+  //           print("-------seed array = ${byteArrayToString(seedArray)}-------");
+
+  //           List<int> keyBuffer = [];
+  //           final rc = await calculateSeedkey!.calculateSeedkey(
+  //             index: selectedIndex,
+  //             seed: seedArray,
+  //             keyOutput: keyBuffer,
+  //           );
+  //           if (rc != 0 || keyBuffer.isEmpty) {
+  //             // ✅ CHANGED: log the resolved algo, not the script string
+  //             print("❌ Key calc failed for ${selectedIndex.name} (rc=$rc)");
+  //             return ReadParameterResponse()
+  //               ..pidId = readParameter.pidId
+  //               ..status = "KEY_CALC_FAILED";
+  //           }
+
+  //           seedKey = Uint8List.fromList(keyBuffer);
+  //           print(
+  //             "-------get key response = ${byteArrayToString(seedKey)}-------",
+  //           );
+  //         }
+  //       } else if (command == "readpid") {
+  //         if (reprogrammingResponse != null) {
+  //           readParameterResponse = await pidConvertResponse(
+  //             reprogrammingResponse,
+  //             readParameter,
+  //           );
+  //         }
+  //       }
+  //     }
+  //   } catch (ex, stack) {
+  //     print("Exception : $ex $stack");
+  //     readParameterResponse.status = "Exception";
+  //   }
+
+  //   return readParameterResponse;
+  // }
+
   Future<ReadParameterResponse> readParametersFromAddr(
     ReadParameterPID readParameter,
     String pidByAddrSeq,
-     SeedKeyIndexType? ecuSeedKeyIndex,
+    SeedKeyIndexType? ecuSeedKeyIndex,
   ) async {
     List<String> lineData = pidByAddrSeq.split('\n');
 
@@ -6524,71 +6809,31 @@ class UDSDiagnostic {
       for (int i = 0; i < lineData.length; i++) {
         String formattedLine = lineData[i].replaceAll('\r', '').trim();
 
-        if (formattedLine.startsWith("//") || formattedLine == "") {
-          continue;
-        }
+        if (formattedLine.startsWith("//") || formattedLine.isEmpty) continue;
 
         if (formattedLine.contains("startread")) isReadStarted = true;
-
         if (isReadStarted && formattedLine.contains("endread")) {
           isReadStarted = false;
         }
-
         if (!isReadStarted) continue;
 
         List<String> parts = formattedLine.split(':');
         String command = parts[0];
         String info = parts.length > 1 ? parts[1] : "";
 
-        if (command == "send") {
-          List<String> splitData = info.split('+');
-          List<int> txFrameList = [];
+        if (command == "send" || command == "sendignore") {
+          final List<int> txFrameList = _buildTxFrame(
+            info,
+            seedKey: seedKey,
+            pid: readParameter.pid,
+            lenValue: readParameter.totalLen ?? 0,
+          );
 
-          for (var item in splitData) {
-            if (!item.contains("<")) {
-              txFrameList.addAll(hexStringToByteArray(item));
-            } else {
-              int endIndex = item.indexOf('>');
-              // item.substring(1, endIndex) gets content between < and >
-              String bracketString = item.substring(1, endIndex);
-              List<String> bracketParts = bracketString.split(',');
-              String reference = bracketParts[0];
-
-              // Convert hex length string to int
-              int copyLength = int.parse(bracketParts[1], radix: 16);
-              List<int> copyArray = [];
-
-              if (reference.contains("key")) {
-                copyArray = List<int>.from(seedKey);
-              } else if (reference.contains("pid_addr")) {
-                copyArray = hexStringToByteArray(readParameter.pid ?? "");
-
-                if (copyArray.length > copyLength) {
-                  copyArray = copyArray.sublist(copyArray.length - copyLength);
-                }
-              } else if (reference.contains("pid_len")) {
-                // Convert totalLen to bytes (Big Endian logic like C# Array.Reverse)
-                int totalLen = readParameter.totalLen ?? 0;
-                ByteData bdata = ByteData(4)
-                  ..setUint32(0, totalLen, Endian.big);
-                copyArray = bdata.buffer.asUint8List().toList();
-
-                if (copyArray.length > copyLength) {
-                  copyArray = copyArray.sublist(copyArray.length - copyLength);
-                }
-              }
-
-              // Ensure the copyArray matches the requested copyLength
-              if (copyArray.length > copyLength) {
-                copyArray = copyArray.sublist(0, copyLength);
-              } else if (copyArray.length < copyLength) {
-                // Pad with zeros if too short
-                copyArray = List<int>.from(copyArray)
-                  ..addAll(List.filled(copyLength - copyArray.length, 0));
-              }
-
-              txFrameList.addAll(copyArray);
-            }
+          // ✅ NEW: sendignore
+          if (command == "sendignore") {
+            final ResponseArrayStatus? r = await _sendIgnore(txFrameList);
+            if (r != null) reprogrammingResponse = r;
+            continue;
           }
 
           String txHexString = byteArrayToString(
@@ -6601,10 +6846,9 @@ class UDSDiagnostic {
             txHexString,
           );
 
-          // Handle "Required Time Delay Not Expired" loop
           while (reprogrammingResponse?.ecuResponseStatus ==
               "ECUERROR_REQUIREDTIMEDELAYNOTEXPIRED") {
-            await Future.delayed(Duration(milliseconds: 300));
+            await Future.delayed(const Duration(milliseconds: 300));
             reprogrammingResponse = await dongleComm!.canTxRx(
               txFrameList.length,
               txHexString,
@@ -6615,102 +6859,16 @@ class UDSDiagnostic {
             print(
               "ELMZ : --------- reprogrammingResponse ERROR------------==${reprogrammingResponse?.ecuResponseStatus}",
             );
-            readParameterResponse = ReadParameterResponse()
+            return ReadParameterResponse()
               ..pidId = readParameter.pidId
               ..status = reprogrammingResponse?.ecuResponseStatus;
-            return readParameterResponse;
           }
         } else if (command == "sleep") {
           await Future.delayed(Duration(milliseconds: int.parse(info)));
-        }
-        // else if (command == "function") {
-        //   if (info.contains("CalculateKeyFromSeed")) {
-        //     int startIdx = info.indexOf('[') + 1;
-        //     int endIdx = info.indexOf(']');
-        //     String sqrBktInfo = info.substring(startIdx, endIdx);
-        //     List<String> params = sqrBktInfo.split(',');
-        //     String seedKeyIndexStr = params[0].replaceAll(
-        //       '-',
-        //       '_',
-        //     ); // e.g., "UDS_LEVEL_1"
-        //     // 1. Convert String to Enum
-        //     // We look for a match in SeedKeyIndexType.values
-        //     SeedKeyIndexType? selectedIndex;
-        //     try {
-        //       selectedIndex = SeedKeyIndexType.values.firstWhere(
-        //         (e) => e.toString().split('.').last == seedKeyIndexStr,
-        //       );
-        //     } catch (e) {
-        //       print("Error: $seedKeyIndexStr is not a valid SeedKeyIndexType");
-        //     }
-        //     if (selectedIndex != null) {
-        //       Uint8List actualBytes = reprogrammingResponse!.actualDataBytes!;
-        //       // Skip the first 2 bytes (usually service ID and sub-function)
-        //       Uint8List seedArray = actualBytes.sublist(2);
-        //       print(
-        //         "-------seed array = ${byteArrayToString(seedArray)}-------",
-        //       );
-        //       print("-------get key-------");
-        //       // 2. Pass the Enum 'selectedIndex', not the String
-        //       // Also ensuring we initialize the keyOutput list if your method requires it
-        //       List<int> keyBuffer = [];
-        //       await calculateSeedkey!.calculateSeedkey(
-        //         index: selectedIndex,
-        //         seed: seedArray,
-        //         keyOutput: keyBuffer,
-        //       );
-        //       // 3. Convert the result back to Uint8List
-        //       seedKey = Uint8List.fromList(keyBuffer);
-        //       print(
-        //         "-------get key response = ${byteArrayToString(seedKey)}-------",
-        //       );
-        //     }
-        //   }
-        // }
-        // else if (command == "function") {
-        //   if (info.contains("CalculateKeyFromSeed")) {
-        //     int startIdx = info.indexOf('[') + 1;
-        //     int endIdx = info.indexOf(']');
-        //     String sqrBktInfo = info.substring(startIdx, endIdx);
-        //     List<String> params = sqrBktInfo.split(',');
-        //     String seedKeyIndexStr = params[0].replaceAll('-', '_');
-
-        //     final selectedIndex = SeedKeyIndexType.fromApi(
-        //       seedKeyIndexStr,
-        //     ); // ✅ matches "KOEL_CPCB4_LOW_HP_ECU"
-        //     if (selectedIndex == null) {
-        //       print("❌ Unknown seed-key type: $seedKeyIndexStr");
-        //       readParameterResponse
-        //         ..pidId = readParameter.pidId
-        //         ..status = "SEEDKEY_TYPE_NOT_FOUND";
-        //       return readParameterResponse; // abort — never send the <key> frame with zeros
-        //     }
-
-        //     Uint8List seedArray = reprogrammingResponse!.actualDataBytes!
-        //         .sublist(2);
-        //     print("-------seed array = ${byteArrayToString(seedArray)}-------");
-
-        //     List<int> keyBuffer = [];
-        //     await calculateSeedkey!.calculateSeedkey(
-        //       index: selectedIndex,
-        //       seed: seedArray,
-        //       keyOutput: keyBuffer,
-        //     );
-        //     seedKey = Uint8List.fromList(keyBuffer);
-        //     print(
-        //       "-------get key response = ${byteArrayToString(seedKey)}-------",
-        //     );
-        //   }
-        // } 
-
-                        else if (command == "function") {
+        } else if (command == "function") {
           if (info.contains("CalculateKeyFromSeed")) {
-            int startIdx = info.indexOf('[') + 1;
-            int endIdx = info.indexOf(']');
-
-            // ✅ CHANGED: supports both [8] and [NAME,8]
             final List<String> params = info
-                .substring(startIdx, endIdx)
+                .substring(info.indexOf('[') + 1, info.indexOf(']'))
                 .split(',')
                 .map((s) => s.trim())
                 .where((s) => s.isNotEmpty)
@@ -6723,11 +6881,10 @@ class UDSDiagnostic {
                 ..status = "SEEDKEY_SCRIPT_INVALID";
             }
 
-            // ✅ CHANGED: length is always the LAST param
             final int seedLen = int.parse(params.last, radix: 16);
 
-            // ✅ CHANGED: ECU config first, script name only as fallback
-            final SeedKeyIndexType? selectedIndex = ecuSeedKeyIndex ??
+            final SeedKeyIndexType? selectedIndex =
+                ecuSeedKeyIndex ??
                 (params.length >= 2
                     ? SeedKeyIndexType.fromApi(params[0].replaceAll('-', '_'))
                     : null);
@@ -6743,10 +6900,8 @@ class UDSDiagnostic {
               "(${ecuSeedKeyIndex != null ? 'from ECU' : 'from script'})",
             );
 
-            // ✅ Matches C#: seed is exactly seedLen bytes, zero-padded if short
             final Uint8List rx = reprogrammingResponse!.actualDataBytes!;
             if (rx.length < 2) {
-              // ✅ NEW: guard — a too-short seed response would make 'available' negative
               return ReadParameterResponse()
                 ..pidId = readParameter.pidId
                 ..status = "SEED_RESPONSE_INVALID";
@@ -6767,7 +6922,6 @@ class UDSDiagnostic {
               keyOutput: keyBuffer,
             );
             if (rc != 0 || keyBuffer.isEmpty) {
-              // ✅ CHANGED: log the resolved algo, not the script string
               print("❌ Key calc failed for ${selectedIndex.name} (rc=$rc)");
               return ReadParameterResponse()
                 ..pidId = readParameter.pidId
@@ -6775,10 +6929,11 @@ class UDSDiagnostic {
             }
 
             seedKey = Uint8List.fromList(keyBuffer);
-            print("-------get key response = ${byteArrayToString(seedKey)}-------");
+            print(
+              "-------get key response = ${byteArrayToString(seedKey)}-------",
+            );
           }
-        }
-        else if (command == "readpid") {
+        } else if (command == "readpid") {
           if (reprogrammingResponse != null) {
             readParameterResponse = await pidConvertResponse(
               reprogrammingResponse,
@@ -7036,6 +7191,76 @@ class UDSDiagnostic {
       print(" END LOOP PID NAME = ${pidItem.pid}");
     }
     return databyteArray;
+  }
+
+  List<int> _buildTxFrame(
+    String info, {
+    required Uint8List seedKey,
+    String? pid,
+    int lenValue = 0, // read: totalLen, write: totalBytes
+    List<int>? writeInput, // write only
+  }) {
+    final List<int> txFrameList = [];
+
+    for (final rawItem in info.split('+')) {
+      final String item = rawItem.trim();
+      if (item.isEmpty) continue;
+
+      if (!item.contains('<')) {
+        txFrameList.addAll(hexStringToByteArray(item));
+        continue;
+      }
+
+      final String inner = item.substring(
+        item.indexOf('<') + 1,
+        item.indexOf('>'),
+      );
+      final List<String> parts = inner.split(',');
+      final String reference = parts[0].trim();
+      int copyLength = parts.length > 1
+          ? int.parse(parts[1].trim(), radix: 16)
+          : 0;
+
+      List<int> src = [];
+
+      if (reference.contains('key')) {
+        src = seedKey;
+      } else if (reference.contains('pid_addr')) {
+        src = hexStringToByteArray(pid ?? '');
+        if (src.length > copyLength) src = src.sublist(src.length - copyLength);
+      } else if (reference.contains('pid_len')) {
+        final ByteData b = ByteData(4)..setUint32(0, lenValue, Endian.big);
+        src = b.buffer.asUint8List();
+        if (src.length > copyLength) src = src.sublist(src.length - copyLength);
+      } else if (reference.contains('writePid')) {
+        src = writeInput ?? [];
+        copyLength =
+            lenValue; // <writePid> has no length in script → totalBytes
+      }
+
+      // Fit to copyLength: truncate or zero-pad
+      final Uint8List out = Uint8List(copyLength);
+      out.setRange(0, src.length < copyLength ? src.length : copyLength, src);
+      txFrameList.addAll(out);
+    }
+
+    return txFrameList;
+  }
+
+  Future<ResponseArrayStatus?> _sendIgnore(List<int> txFrame) async {
+    final String txHex = byteArrayToString(Uint8List.fromList(txFrame));
+    print("sendignore : Sending Command $txHex");
+    try {
+      final ResponseArrayStatus? resp = await dongleComm!.canTxRx(
+        txFrame.length,
+        txHex,
+      );
+      print("sendignore : response ${resp?.ecuResponseStatus} (ignored)");
+      return resp?.ecuResponseStatus == "NOERROR" ? resp : null;
+    } catch (e) {
+      print("sendignore : exception ignored: $e");
+      return null;
+    }
   }
 
   Future<List<WriteParameterResponse>?> writeParameters(
@@ -7718,6 +7943,304 @@ class UDSDiagnostic {
     return writeParameterResponseList;
   }
 
+  // Future<WriteParameterResponse> writeParametersFromAddr(
+  //   WriteParameterPID writeParameter,
+  //   String pidByAddrSeq,
+  //   SeedKeyIndexType? ecuSeedKeyIndex,
+  // ) async {
+  //   List<String> lineData = pidByAddrSeq.split('\n');
+
+  //   ResponseArrayStatus? reprogrammingResponse;
+  //   WriteParameterResponse writeParameterResponse = WriteParameterResponse();
+  //   Uint8List seedKey = Uint8List(0);
+
+  //   try {
+  //     bool isWriteStarted = false;
+  //     for (int i = 0; i < lineData.length; i++) {
+  //       String formattedLine = lineData[i].replaceAll('\r', '').trim();
+
+  //       // Skip comments and empty lines
+  //       if (formattedLine.startsWith("//") || formattedLine.isEmpty) {
+  //         continue;
+  //       }
+
+  //       if (formattedLine.contains("startwrite")) isWriteStarted = true;
+  //       if (isWriteStarted && formattedLine.contains("endwrite"))
+  //         isWriteStarted = false;
+
+  //       if (!isWriteStarted) continue;
+
+  //       List<String> lineParts = formattedLine.split(':');
+  //       String command = lineParts[0];
+  //       String info = lineParts.length > 1 ? lineParts[1] : "";
+
+  //       if (command == "send" || command == "sendroutine") {
+  //         List<String> splitData = info.split('+');
+  //         List<int> txFrameList = [];
+
+  //         for (var item in splitData) {
+  //           if (!item.contains("<")) {
+  //             txFrameList.addAll(hexStringToByteArray(item));
+  //           } else {
+  //             int endIndex = item.indexOf('>');
+  //             String bracketString = item.substring(1, endIndex);
+  //             List<String> bracketParts = bracketString.split(',');
+  //             String reference = bracketParts[0];
+
+  //             int copyLength = 0;
+  //             if (bracketString.contains(',')) {
+  //               copyLength = int.parse(bracketParts[1], radix: 16);
+  //             }
+
+  //             Uint8List? copyArray = Uint8List(0);
+
+  //             if (reference.contains("key")) {
+  //               copyArray = seedKey;
+  //             } else if (reference.contains("pid_addr")) {
+  //               Uint8List addrArray = hexStringToByteArray(
+  //                 writeParameter.pid ?? "",
+  //               );
+  //               if (addrArray.length > copyLength) {
+  //                 copyArray = addrArray.sublist(addrArray.length - copyLength);
+  //               } else {
+  //                 copyArray = addrArray;
+  //               }
+  //             } else if (reference.contains("pid_len")) {
+  //               // Get total bytes as Big Endian byte array
+  //               int totalBytes = writeParameter.totalBytes ?? 0;
+  //               ByteData bData = ByteData(4)
+  //                 ..setUint32(0, totalBytes, Endian.big);
+  //               Uint8List lenArray = bData.buffer.asUint8List();
+
+  //               if (lenArray.length > copyLength) {
+  //                 copyArray = lenArray.sublist(lenArray.length - copyLength);
+  //               } else {
+  //                 copyArray = lenArray;
+  //               }
+  //             } else if (reference.contains("writePid")) {
+  //               // Wrap the List<int> in Uint8List.fromList to convert the type
+  //               copyArray = Uint8List.fromList(writeParameter.writeInput ?? []);
+  //               copyLength = writeParameter.totalBytes ?? 0;
+  //             }
+
+  //             // Resize logic: Ensure copyArray matches copyLength
+  //             Uint8List finalCopy = Uint8List(copyLength);
+  //             int bytesToCopy = copyArray.length > copyLength
+  //                 ? copyLength
+  //                 : copyArray.length;
+  //             finalCopy.setRange(0, bytesToCopy, copyArray);
+
+  //             txFrameList.addAll(finalCopy);
+  //           }
+  //         }
+
+  //         Uint8List txFrame = Uint8List.fromList(txFrameList);
+  //         print("send : Sending Command ${byteArrayToString(txFrame)}");
+  //         reprogrammingResponse = await dongleComm!.canTxRx(
+  //           txFrame.length,
+  //           byteArrayToString(txFrame),
+  //         );
+
+  //         // Handle Time Delay Error
+  //         while (reprogrammingResponse?.ecuResponseStatus ==
+  //             "ECUERROR_REQUIREDTIMEDELAYNOTEXPIRED") {
+  //           await Future.delayed(const Duration(milliseconds: 300));
+  //           reprogrammingResponse = await dongleComm!.canTxRx(
+  //             txFrame.length,
+  //             byteArrayToString(txFrame),
+  //           );
+  //         }
+
+  //         writeParameterResponse.status =
+  //             reprogrammingResponse?.ecuResponseStatus;
+
+  //         if (reprogrammingResponse?.ecuResponseStatus != "NOERROR") {
+  //           print(
+  //             "ELMZ : --------- reprogrammingResponse ERROR------------==${reprogrammingResponse?.ecuResponseStatus}",
+  //           );
+  //           return writeParameterResponse;
+  //         }
+
+  //         // Handle Routine Loop
+  //         if (command == "sendroutine") {
+  //           // Equivalent of 3103 + substring after first 4 chars of splitData[0]
+  //           String routineReqCommand =
+  //               "3103" + splitData[0].trim().substring(4);
+
+  //           bool isRoutineLoop = true;
+  //           while (isRoutineLoop) {
+  //             await Future.delayed(const Duration(milliseconds: 500));
+  //             print("RoutineSend : Sending Command $routineReqCommand");
+  //             reprogrammingResponse = await dongleComm!.canTxRx(
+  //               routineReqCommand.length ~/ 2,
+  //               routineReqCommand,
+  //             );
+
+  //             if (reprogrammingResponse.ecuResponseStatus != "NOERROR") {
+  //               print(
+  //                 "ELMZ : --------- Routine ERROR------------==${reprogrammingResponse.ecuResponseStatus}",
+  //               );
+  //               isRoutineLoop = false;
+  //               writeParameterResponse.status =
+  //                   reprogrammingResponse.ecuResponseStatus;
+  //               return writeParameterResponse;
+  //             } else if (reprogrammingResponse.actualDataBytes![4] != 0x02) {
+  //               // Routine no longer active/finished
+  //               isRoutineLoop = false;
+  //             }
+  //           }
+  //         }
+  //       } else if (command == "sleep") {
+  //         await Future.delayed(Duration(milliseconds: int.parse(info)));
+  //         // } else if (command == "function") {
+  //         //   if (info.contains("CalculateKeyFromSeed")) {
+  //         //     int startIdx = info.indexOf('[') + 1;
+  //         //     int endIdx = info.indexOf(']');
+  //         //     String sqrBktInfo = info.substring(startIdx, endIdx);
+  //         //     List<String> params = sqrBktInfo.split(',');
+
+  //         //     // String seedKeyIndexStr = params[0].replaceAll('-', '_');
+  //         //     // int seedKeyNumBytes = int.parse(params[1], radix: 16);
+
+  //         //     // // Find Enum value in Dart
+  //         //     // SeedKeyIndexType selectedIndex = SeedKeyIndexType.values.firstWhere(
+  //         //     //   (e) => e.toString().split('.').last == seedKeyIndexStr,
+  //         //     //   orElse: () => SeedKeyIndexType.values.first,
+  //         //     // );
+
+  //         //     // Uint8List? actualData = reprogrammingResponse!.actualDataBytes;
+  //         //     // Uint8List seedArray = actualData!.sublist(2, 2 + seedKeyNumBytes);
+
+  //         //     // print("-------seed array = ${byteArrayToString(seedArray)}-------");
+  //         //     // print("-------get key-------");
+
+  //         //     // // Buffer for result
+  //         //     // List<int> keyBuffer = [];
+  //         //     // await calculateSeedkey!.calculateSeedkey(
+  //         //     //   index: selectedIndex,
+  //         //     //   seed: seedArray,
+  //         //     //   keyOutput: keyBuffer,
+  //         //     // );
+
+  //         //     // seedKey = Uint8List.fromList(keyBuffer);
+  //         //     // print(
+  //         //     //   "-------get key response = ${byteArrayToString(seedKey)}-------",
+  //         //     // );
+  //         //     String seedKeyIndexStr = params[0].replaceAll('-', '_');
+  //         //     int seedKeyNumBytes = int.parse(params[1], radix: 16);
+
+  //         //     // ✅ Resolve via fromApi (SNAKE_CASE API string → enum). The old
+  //         //     // firstWhere-by-name + orElse:first silently picked greavesAdvantekBs6A46
+  //         //     // for KOEL_CPCB4_LOW_HP_ECU, whose algo isn't implemented → zero key → 7F2735.
+  //         //     final selectedIndex = SeedKeyIndexType.fromApi(seedKeyIndexStr);
+  //         //     if (selectedIndex == null) {
+  //         //       print(
+  //         //         "❌ Unknown seed-key type: $seedKeyIndexStr — aborting write",
+  //         //       );
+  //         //       writeParameterResponse.status = "SEEDKEY_TYPE_NOT_FOUND";
+  //         //       return writeParameterResponse; // do NOT send 27 xx with zeros
+  //         //     }
+
+  //         //     Uint8List? actualData = reprogrammingResponse!.actualDataBytes;
+  //         //     Uint8List seedArray = actualData!.sublist(2, 2 + seedKeyNumBytes);
+
+  //         //     print("-------seed array = ${byteArrayToString(seedArray)}-------");
+  //         //     print("-------get key-------");
+
+  //         //     List<int> keyBuffer = [];
+  //         //     final rc = await calculateSeedkey!.calculateSeedkey(
+  //         //       index: selectedIndex,
+  //         //       seed: seedArray,
+  //         //       keyOutput: keyBuffer,
+  //         //     );
+  //         //     if (rc != 0 || keyBuffer.isEmpty) {
+  //         //       print("❌ Key calc failed for $seedKeyIndexStr (rc=$rc)");
+  //         //       writeParameterResponse.status = "KEY_CALC_FAILED";
+  //         //       return writeParameterResponse;
+  //         //     }
+
+  //         //     seedKey = Uint8List.fromList(keyBuffer);
+  //         //     print(
+  //         //       "-------get key response = ${byteArrayToString(seedKey)}-------",
+  //         //     );
+  //         //   }
+  //         // }
+  //       } else if (command == "function") {
+  //         if (info.contains("CalculateKeyFromSeed")) {
+  //           final List<String> params = info
+  //               .substring(info.indexOf('[') + 1, info.indexOf(']'))
+  //               .split(',')
+  //               .map((s) => s.trim())
+  //               .where((s) => s.isNotEmpty)
+  //               .toList();
+
+  //           if (params.isEmpty) {
+  //             print("❌ CalculateKeyFromSeed has no parameters: $info");
+  //             writeParameterResponse.status = "SEEDKEY_SCRIPT_INVALID";
+  //             return writeParameterResponse;
+  //           }
+
+  //           // Length is always the LAST param: [8] or [NAME,8]
+  //           final int seedLen = int.parse(params.last, radix: 16);
+
+  //           // ECU config first, script name only as fallback
+  //           final SeedKeyIndexType? selectedIndex =
+  //               ecuSeedKeyIndex ??
+  //               (params.length >= 2
+  //                   ? SeedKeyIndexType.fromApi(params[0].replaceAll('-', '_'))
+  //                   : null);
+
+  //           if (selectedIndex == null) {
+  //             print("❌ No seed-key algo — ECU config empty, script: $info");
+  //             writeParameterResponse.status = "SEEDKEY_TYPE_NOT_FOUND";
+  //             return writeParameterResponse; // never send 27 xx with zeros
+  //           }
+  //           print(
+  //             "🔑 seed-key algo: ${selectedIndex.name} "
+  //             "(${ecuSeedKeyIndex != null ? 'from ECU' : 'from script'})",
+  //           );
+
+  //           final Uint8List rx = reprogrammingResponse!.actualDataBytes!;
+  //           if (rx.length < 2) {
+  //             writeParameterResponse.status = "SEED_RESPONSE_INVALID";
+  //             return writeParameterResponse;
+  //           }
+  //           final Uint8List seedArray = Uint8List(seedLen);
+  //           final int available = rx.length - 2;
+  //           seedArray.setRange(
+  //             0,
+  //             available < seedLen ? available : seedLen,
+  //             rx.sublist(2),
+  //           );
+  //           print("-------seed array = ${byteArrayToString(seedArray)}-------");
+
+  //           List<int> keyBuffer = [];
+  //           final rc = await calculateSeedkey!.calculateSeedkey(
+  //             index: selectedIndex,
+  //             seed: seedArray,
+  //             keyOutput: keyBuffer,
+  //           );
+  //           if (rc != 0 || keyBuffer.isEmpty) {
+  //             print("❌ Key calc failed for ${selectedIndex.name} (rc=$rc)");
+  //             writeParameterResponse.status = "KEY_CALC_FAILED";
+  //             return writeParameterResponse;
+  //           }
+
+  //           seedKey = Uint8List.fromList(keyBuffer);
+  //           print(
+  //             "-------get key response = ${byteArrayToString(seedKey)}-------",
+  //           );
+  //         }
+  //       }
+  //     }
+  //   } catch (ex, stackTrace) {
+  //     print("Exception : $ex $stackTrace");
+  //     writeParameterResponse.status = "Exception";
+  //   }
+
+  //   return writeParameterResponse;
+  // }
+
   Future<WriteParameterResponse> writeParametersFromAddr(
     WriteParameterPID writeParameter,
     String pidByAddrSeq,
@@ -7734,95 +8257,52 @@ class UDSDiagnostic {
       for (int i = 0; i < lineData.length; i++) {
         String formattedLine = lineData[i].replaceAll('\r', '').trim();
 
-        // Skip comments and empty lines
-        if (formattedLine.startsWith("//") || formattedLine.isEmpty) {
-          continue;
-        }
+        if (formattedLine.startsWith("//") || formattedLine.isEmpty) continue;
 
         if (formattedLine.contains("startwrite")) isWriteStarted = true;
-        if (isWriteStarted && formattedLine.contains("endwrite"))
+        if (isWriteStarted && formattedLine.contains("endwrite")) {
           isWriteStarted = false;
-
+        }
         if (!isWriteStarted) continue;
 
         List<String> lineParts = formattedLine.split(':');
         String command = lineParts[0];
         String info = lineParts.length > 1 ? lineParts[1] : "";
 
-        if (command == "send" || command == "sendroutine") {
-          List<String> splitData = info.split('+');
-          List<int> txFrameList = [];
-
-          for (var item in splitData) {
-            if (!item.contains("<")) {
-              txFrameList.addAll(hexStringToByteArray(item));
-            } else {
-              int endIndex = item.indexOf('>');
-              String bracketString = item.substring(1, endIndex);
-              List<String> bracketParts = bracketString.split(',');
-              String reference = bracketParts[0];
-
-              int copyLength = 0;
-              if (bracketString.contains(',')) {
-                copyLength = int.parse(bracketParts[1], radix: 16);
-              }
-
-              Uint8List? copyArray = Uint8List(0);
-
-              if (reference.contains("key")) {
-                copyArray = seedKey;
-              } else if (reference.contains("pid_addr")) {
-                Uint8List addrArray = hexStringToByteArray(
-                  writeParameter.pid ?? "",
-                );
-                if (addrArray.length > copyLength) {
-                  copyArray = addrArray.sublist(addrArray.length - copyLength);
-                } else {
-                  copyArray = addrArray;
-                }
-              } else if (reference.contains("pid_len")) {
-                // Get total bytes as Big Endian byte array
-                int totalBytes = writeParameter.totalBytes ?? 0;
-                ByteData bData = ByteData(4)
-                  ..setUint32(0, totalBytes, Endian.big);
-                Uint8List lenArray = bData.buffer.asUint8List();
-
-                if (lenArray.length > copyLength) {
-                  copyArray = lenArray.sublist(lenArray.length - copyLength);
-                } else {
-                  copyArray = lenArray;
-                }
-              } else if (reference.contains("writePid")) {
-                // Wrap the List<int> in Uint8List.fromList to convert the type
-                copyArray = Uint8List.fromList(writeParameter.writeInput ?? []);
-                copyLength = writeParameter.totalBytes ?? 0;
-              }
-
-              // Resize logic: Ensure copyArray matches copyLength
-              Uint8List finalCopy = Uint8List(copyLength);
-              int bytesToCopy = copyArray.length > copyLength
-                  ? copyLength
-                  : copyArray.length;
-              finalCopy.setRange(0, bytesToCopy, copyArray);
-
-              txFrameList.addAll(finalCopy);
-            }
-          }
-
-          Uint8List txFrame = Uint8List.fromList(txFrameList);
-          print("send : Sending Command ${byteArrayToString(txFrame)}");
-          reprogrammingResponse = await dongleComm!.canTxRx(
-            txFrame.length,
-            byteArrayToString(txFrame),
+        if (command == "send" ||
+            command == "sendroutine" ||
+            command == "sendignore") {
+          final List<int> txFrameList = _buildTxFrame(
+            info,
+            seedKey: seedKey,
+            pid: writeParameter.pid,
+            lenValue: writeParameter.totalBytes ?? 0,
+            writeInput: writeParameter.writeInput,
           );
 
-          // Handle Time Delay Error
+          // ✅ NEW: sendignore — doesn't touch writeParameterResponse.status
+          if (command == "sendignore") {
+            final ResponseArrayStatus? r = await _sendIgnore(txFrameList);
+            if (r != null) reprogrammingResponse = r;
+            continue;
+          }
+
+          final String txHex = byteArrayToString(
+            Uint8List.fromList(txFrameList),
+          );
+          print("$command : Sending Command $txHex");
+
+          reprogrammingResponse = await dongleComm!.canTxRx(
+            txFrameList.length,
+            txHex,
+          );
+
           while (reprogrammingResponse?.ecuResponseStatus ==
               "ECUERROR_REQUIREDTIMEDELAYNOTEXPIRED") {
             await Future.delayed(const Duration(milliseconds: 300));
             reprogrammingResponse = await dongleComm!.canTxRx(
-              txFrame.length,
-              byteArrayToString(txFrame),
+              txFrameList.length,
+              txHex,
             );
           }
 
@@ -7836,11 +8316,10 @@ class UDSDiagnostic {
             return writeParameterResponse;
           }
 
-          // Handle Routine Loop
+          // Routine polling loop
           if (command == "sendroutine") {
-            // Equivalent of 3103 + substring after first 4 chars of splitData[0]
-            String routineReqCommand =
-                "3103" + splitData[0].trim().substring(4);
+            final String routineReqCommand =
+                "3103" + info.split('+')[0].trim().substring(4);
 
             bool isRoutineLoop = true;
             while (isRoutineLoop) {
@@ -7851,96 +8330,21 @@ class UDSDiagnostic {
                 routineReqCommand,
               );
 
-              if (reprogrammingResponse.ecuResponseStatus != "NOERROR") {
+              if (reprogrammingResponse?.ecuResponseStatus != "NOERROR") {
                 print(
-                  "ELMZ : --------- Routine ERROR------------==${reprogrammingResponse.ecuResponseStatus}",
+                  "ELMZ : --------- Routine ERROR------------==${reprogrammingResponse?.ecuResponseStatus}",
                 );
-                isRoutineLoop = false;
                 writeParameterResponse.status =
-                    reprogrammingResponse.ecuResponseStatus;
+                    reprogrammingResponse?.ecuResponseStatus;
                 return writeParameterResponse;
-              } else if (reprogrammingResponse.actualDataBytes![4] != 0x02) {
-                // Routine no longer active/finished
-                isRoutineLoop = false;
+              } else if (reprogrammingResponse!.actualDataBytes![4] != 0x02) {
+                isRoutineLoop = false; // routine finished
               }
             }
           }
         } else if (command == "sleep") {
           await Future.delayed(Duration(milliseconds: int.parse(info)));
-        // } else if (command == "function") {
-        //   if (info.contains("CalculateKeyFromSeed")) {
-        //     int startIdx = info.indexOf('[') + 1;
-        //     int endIdx = info.indexOf(']');
-        //     String sqrBktInfo = info.substring(startIdx, endIdx);
-        //     List<String> params = sqrBktInfo.split(',');
-
-        //     // String seedKeyIndexStr = params[0].replaceAll('-', '_');
-        //     // int seedKeyNumBytes = int.parse(params[1], radix: 16);
-
-        //     // // Find Enum value in Dart
-        //     // SeedKeyIndexType selectedIndex = SeedKeyIndexType.values.firstWhere(
-        //     //   (e) => e.toString().split('.').last == seedKeyIndexStr,
-        //     //   orElse: () => SeedKeyIndexType.values.first,
-        //     // );
-
-        //     // Uint8List? actualData = reprogrammingResponse!.actualDataBytes;
-        //     // Uint8List seedArray = actualData!.sublist(2, 2 + seedKeyNumBytes);
-
-        //     // print("-------seed array = ${byteArrayToString(seedArray)}-------");
-        //     // print("-------get key-------");
-
-        //     // // Buffer for result
-        //     // List<int> keyBuffer = [];
-        //     // await calculateSeedkey!.calculateSeedkey(
-        //     //   index: selectedIndex,
-        //     //   seed: seedArray,
-        //     //   keyOutput: keyBuffer,
-        //     // );
-
-        //     // seedKey = Uint8List.fromList(keyBuffer);
-        //     // print(
-        //     //   "-------get key response = ${byteArrayToString(seedKey)}-------",
-        //     // );
-        //     String seedKeyIndexStr = params[0].replaceAll('-', '_');
-        //     int seedKeyNumBytes = int.parse(params[1], radix: 16);
-
-        //     // ✅ Resolve via fromApi (SNAKE_CASE API string → enum). The old
-        //     // firstWhere-by-name + orElse:first silently picked greavesAdvantekBs6A46
-        //     // for KOEL_CPCB4_LOW_HP_ECU, whose algo isn't implemented → zero key → 7F2735.
-        //     final selectedIndex = SeedKeyIndexType.fromApi(seedKeyIndexStr);
-        //     if (selectedIndex == null) {
-        //       print(
-        //         "❌ Unknown seed-key type: $seedKeyIndexStr — aborting write",
-        //       );
-        //       writeParameterResponse.status = "SEEDKEY_TYPE_NOT_FOUND";
-        //       return writeParameterResponse; // do NOT send 27 xx with zeros
-        //     }
-
-        //     Uint8List? actualData = reprogrammingResponse!.actualDataBytes;
-        //     Uint8List seedArray = actualData!.sublist(2, 2 + seedKeyNumBytes);
-
-        //     print("-------seed array = ${byteArrayToString(seedArray)}-------");
-        //     print("-------get key-------");
-
-        //     List<int> keyBuffer = [];
-        //     final rc = await calculateSeedkey!.calculateSeedkey(
-        //       index: selectedIndex,
-        //       seed: seedArray,
-        //       keyOutput: keyBuffer,
-        //     );
-        //     if (rc != 0 || keyBuffer.isEmpty) {
-        //       print("❌ Key calc failed for $seedKeyIndexStr (rc=$rc)");
-        //       writeParameterResponse.status = "KEY_CALC_FAILED";
-        //       return writeParameterResponse;
-        //     }
-
-        //     seedKey = Uint8List.fromList(keyBuffer);
-        //     print(
-        //       "-------get key response = ${byteArrayToString(seedKey)}-------",
-        //     );
-        //   }
-        // }
-                } else if (command == "function") {
+        } else if (command == "function") {
           if (info.contains("CalculateKeyFromSeed")) {
             final List<String> params = info
                 .substring(info.indexOf('[') + 1, info.indexOf(']'))
@@ -7955,11 +8359,10 @@ class UDSDiagnostic {
               return writeParameterResponse;
             }
 
-            // Length is always the LAST param: [8] or [NAME,8]
             final int seedLen = int.parse(params.last, radix: 16);
 
-            // ECU config first, script name only as fallback
-            final SeedKeyIndexType? selectedIndex = ecuSeedKeyIndex ??
+            final SeedKeyIndexType? selectedIndex =
+                ecuSeedKeyIndex ??
                 (params.length >= 2
                     ? SeedKeyIndexType.fromApi(params[0].replaceAll('-', '_'))
                     : null);
@@ -7967,7 +8370,7 @@ class UDSDiagnostic {
             if (selectedIndex == null) {
               print("❌ No seed-key algo — ECU config empty, script: $info");
               writeParameterResponse.status = "SEEDKEY_TYPE_NOT_FOUND";
-              return writeParameterResponse; // never send 27 xx with zeros
+              return writeParameterResponse;
             }
             print(
               "🔑 seed-key algo: ${selectedIndex.name} "
@@ -8001,7 +8404,9 @@ class UDSDiagnostic {
             }
 
             seedKey = Uint8List.fromList(keyBuffer);
-            print("-------get key response = ${byteArrayToString(seedKey)}-------");
+            print(
+              "-------get key response = ${byteArrayToString(seedKey)}-------",
+            );
           }
         }
       }
